@@ -18,27 +18,29 @@ async def sendMessage(message: str) -> Dict:
     """
     Sends the Message to telegram with the telegram API
     """
+    print(message)
     tg_msg = {"chat_id": CHAT_ID, "text": message, "parse_mode": "Markdown"}
     API_URL = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     async with httpx.AsyncClient() as client:
-        resp = await client.post(API_URL).json()
-    return resp
+        resp = await client.post(API_URL,json=tg_msg)
+    print(resp.json())
+    return resp.json()
 
 
-@app.post("/hook/{name}")
-async def recWebHook(name: str, req: Request) -> str:
+@app.post("/hook")
+async def recWebHook(req: Request) -> str:
     """
     Receive the Webhook and process the Webhook Payload to get relevant data
     Refer https://developer.github.com/webhooks/event-payloads for all GitHub Webhook Events and Payloads
 
     """
-    body = await req.body()
-    payload = await req.json()
-    event = payload.headers.get("X-Github-Event")
+    body = await req.json()
+    print(body)
+    event = req.headers.get("X-Github-Event")
     if event == "star":
         nos_stars = body["repository"]["stargazers_count"]
         starrer_username = body["sender"]["login"]
-        repo_url = body["html_url"]
+        repo_url = body["repository"]["html_url"]
         repo_name = body["repository"]["name"]
         message = f"{starrer_username} has starred the [{repo_name}]({repo_url}). \n\n The Total Stars are {nos_stars}"
         return await sendMessage(message)
