@@ -1,55 +1,49 @@
 from fastapi import FastAPI, Request
 import os
 import httpx
-from typing import Dict
 
 app = FastAPI()
 
 TOKEN = os.getenv("TOKEN")  # Telegram Bot API Key
 CHAT_ID = os.getenv("CHAT_ID")  # Telegram Chat ID
 
-
-@app.get("/")
-async def hello():
-    return "Hello World"
-
-
-async def sendMessage(message: str) -> Dict:
+async def sendTgMessage(message: str):
     """
-    Sends the Message to telegram with the telegram API
+    Sends the Message to telegram with the Telegram BOT API
     """
     print(message)
     tg_msg = {"chat_id": CHAT_ID, "text": message, "parse_mode": "Markdown"}
     API_URL = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
     async with httpx.AsyncClient() as client:
-        resp = await client.post(API_URL,json=tg_msg)
+        resp = await client.post(API_URL, json=tg_msg)
     print(resp.json())
-    return resp.json()
 
 
 @app.post("/hook")
-async def recWebHook(req: Request) -> str:
+async def recWebHook(req: Request):
     """
     Receive the Webhook and process the Webhook Payload to get relevant data
     Refer https://developer.github.com/webhooks/event-payloads for all GitHub Webhook Events and Payloads
-
     """
     body = await req.json()
     print(body)
     event = req.headers.get("X-Github-Event")
-    if event == "star":
+    if event == "star":  # check if the event is a star
         nos_stars = body["repository"]["stargazers_count"]
         starrer_username = body["sender"]["login"]
         repo_url = body["repository"]["html_url"]
         repo_name = body["repository"]["name"]
         message = f"{starrer_username} has starred the [{repo_name}]({repo_url}). \n\n The Total Stars are {nos_stars}"
-        return await sendMessage(message)
-    elif event == "pull_request":
+        await sendTgMessage(message)
+    elif event == "pull_request":  # check if event is a pull request
         pr_number = body["number"]
-        pr_title = body["repository"]["title"]
-        pr_desc = body["repository"]["body"]
-        pr_login = body["repository"]["sender"]["login"]
-        pr_login_url = body["repository"]["sender"]["html_url"]
-        pr_url = body["repository"]["html_url"]
-        message = f"New Pull Request([{pr_number}]({pr_url})) opened by [{pr_login}](pr_login_url).\n\n Title: {pr_title} \n\n Description: {pr_desc}"
-        return await sendMessage(message)
+        if body["pull_request"]["merged"] == True:
+            pr_action = "merged"
+        pr_action = body["action"]
+        pr_title = body["pull_request"]["title"]
+        pr_desc = body["pull_request"]["body"]
+        pr_login = body["sender"]["login"]
+        pr_login_url = body["sender"]["html_url"]
+        pr_url = body["pull_request"]["html_url"]
+        message = f"Pull Request([{pr_number}]({pr_url})) {pr_action} by [{pr_login}]({pr_login_url}).\n\n Title: *{pr_title}* \n\n Description: **{pr_desc}**"
+        await sendTgMessage(message)
